@@ -4,6 +4,11 @@ Scheduled restarts for home routers that can't restart themselves on a schedule,
 Windows PC. It includes a countdown window that lets you postpone or skip a restart, an internet
 watchdog, and a dashboard.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
+  <img src="docs/images/dashboard-light.png" alt="Dashboard: countdown ring to the next restart, connection status, latency chart, 24-hour uptime bar and recent activity" width="820">
+</picture>
+
 > **Router support is narrow on purpose.** Each router model logs in differently, so every model
 > needs its own adapter. Only one model has been verified so far (see [Compatibility](#router-compatibility)).
 > The project never guesses web-interface endpoints.
@@ -26,6 +31,16 @@ interface, exactly as you would in a browser, and presses its restart button for
   activity log, and buttons to restart, test the login, skip the next run, pause, or edit the schedule.
 - **Watchdog (optional):** pops up when the router answers but the internet is down, and records outages.
 - **Credentials** are stored in Windows Credential Manager. They never go in files, logs, task arguments or URLs.
+
+## Screenshots
+
+| Countdown before a scheduled restart | Watchdog alert |
+|---|---|
+| <img src="docs/images/countdown.png" alt="Countdown window with a ring timer and Restart now, Postpone 30 min, Postpone 1 h and Skip buttons" width="400"> | <img src="docs/images/watchdog-popup.png" alt="Watchdog pop-up: No internet, down since 9:16 PM, with Dismiss and Remind me buttons" width="330"> |
+| **Editing the schedule** | **Light theme** |
+| <img src="docs/images/schedule-dialog.png" alt="Schedule dialog with restart time, interval in days and countdown length" width="330"> | <img src="docs/images/dashboard-light.png" alt="Dashboard in the light theme" width="400"> |
+
+*The screenshots use sample data and documentation addresses (192.0.2.1, 198.51.100.23).*
 
 **Limitations:** Windows 10/11 only. One verified router model. The scheduled task runs only while
 you're logged on, because the countdown appears on your desktop. If the PC is off or asleep at the
