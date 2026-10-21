@@ -1,0 +1,21 @@
+{
+  "_comment": "Example only. Run scripts\\Configure.ps1 to create config\\config.json (git-ignored). The password is NOT stored here - Configure.ps1 puts it in Windows Credential Manager.",
+  "router_url": "http://192.0.2.1",
+  "router_model": "gx-gpon-e4222",
+  "username": "YOUR_ROUTER_USERNAME",
+  "restart_time": "04:00",
+  "interval_days": 3,
+  "warn_minutes": 10,
+  "postpone_minutes": [30, 60],
+  "task_name": "RouterAutoRestart",
+  "watchdog_task_name": "RouterAutoRestart-Watchdog",
+  "request_timeout": 10,
+  "login_attempts": 3,
+  "retry_delay": 5,
+  "reboot_cooldown_minutes": 10,
+  "reboot_wait_seconds": 300,
+  "tls_ca_bundle": "",
+  "probe_targets": [["1.1.1.1", 443], ["8.8.8.8", 443], ["9.9.9.9", 443]],
+  "dns_check_host": "example.com",
+  "theme": "system"
+}

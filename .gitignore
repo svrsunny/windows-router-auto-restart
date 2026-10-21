@@ -1,0 +1,35 @@
+# Local configuration and secrets - never commit
+config/config.json
+config/*.local.json
+*.pem
+*.key
+.env
+.env.*
+
+# Runtime state and logs
+data/
+logs/
+*.log
+*.log.1
+*.jsonl
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Windows / editors
+Thumbs.db
+desktop.ini
+*.lnk
+.vscode/
+.idea/
+*.swp
+*~
