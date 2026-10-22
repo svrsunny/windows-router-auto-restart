@@ -60,6 +60,13 @@ the router answers but the internet doesn't. When that happens you get a notific
   retried, and refused for 10 minutes after one was sent.
 - The password is encrypted with a key in the Android Keystore. No telemetry, no third-party libraries.
 
+| Main screen | Outage alert | Internet back |
+|---|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/android-main-dark.png"><img src="docs/images/android-main-light.png" alt="Android app main screen: Internet OK status, Reboot router button, alert switch, router login and Keep it running sections" width="250"></picture> | <img src="docs/images/android-alert.png" alt="Notification: No internet at home (test), router reachable but internet down since 09:33, with a Reboot router button" width="300"> | <img src="docs/images/android-recovered.png" alt="Notification: Internet is back, it was down for less than a minute" width="300"> |
+
+*Android screenshots are from a real phone, with the status bar cropped out. The alert was triggered
+with the app's Simulate an outage switch.*
+
 Download `router-auto-restart-<version>.apk` from the project's
 [Releases](https://github.com/svrsunny/windows-router-auto-restart/releases).
 Setup, how it works, permissions and building from source are in [docs/android.md](docs/android.md).

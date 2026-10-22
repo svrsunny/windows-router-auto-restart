@@ -11,6 +11,10 @@ as **Router Auto Restart** and does two things:
 It works independently of the Windows app: it doesn't need the PC to be on. You can use either one,
 or both.
 
+| Main screen (dark / light) | Outage alert | Internet back |
+|---|---|---|
+| <img src="images/android-main-dark.png" alt="Main screen in the dark theme" width="200"> <img src="images/android-main-light.png" alt="Main screen in the light theme" width="200"> | <img src="images/android-alert.png" alt="Outage alert notification with a Reboot router button" width="280"> | <img src="images/android-recovered.png" alt="Internet is back notification" width="280"> |
+
 - [Requirements](#requirements)
 - [Install](#install)
 - [Set up](#set-up)
