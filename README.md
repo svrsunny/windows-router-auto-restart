@@ -2,7 +2,7 @@
 
 Scheduled restarts for home routers that can't restart themselves on a schedule, driven from a
 Windows PC. It includes a countdown window that lets you postpone or skip a restart, an internet
-watchdog, and a dashboard.
+watchdog, a dashboard and, since 2.2.0, an Android companion app.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
@@ -31,6 +31,8 @@ interface, exactly as you would in a browser, and presses its restart button for
   activity log, and buttons to restart, test the login, skip the next run, pause, or edit the schedule.
 - **Watchdog (optional):** pops up when the router answers but the internet is down, and records outages.
 - **Credentials** are stored in Windows Credential Manager. They never go in files, logs, task arguments or URLs.
+- **Android companion app (optional, new in 2.2.0):** alerts on your phone when the router is up but
+  the internet is down, and restarts the router with one tap. See [Android companion app](#android-companion-app).
 
 ## Screenshots
 
@@ -45,6 +47,22 @@ interface, exactly as you would in a browser, and presses its restart button for
 **Limitations:** Windows 10/11 only. One verified router model. The scheduled task runs only while
 you're logged on, because the countdown appears on your desktop. If the PC is off or asleep at the
 scheduled time, the task runs at the next opportunity.
+
+## Android companion app
+
+Version 2.2.0 adds a companion app for Android 8.0 and later. It appears on the phone as
+**Router Auto Restart**. While your phone is on your home Wi-Fi, it checks every few minutes whether
+the router answers but the internet doesn't. When that happens you get a notification with a
+**Reboot router** button. The app also has a single restart button.
+
+- Works on its own. The Windows app doesn't need to be running.
+- Same login protocol and restart safety rules as the Windows app: the restart is sent once, never
+  retried, and refused for 10 minutes after one was sent.
+- The password is encrypted with a key in the Android Keystore. No telemetry, no third-party libraries.
+
+Download `router-auto-restart-<version>.apk` from the project's
+[Releases](https://github.com/svrsunny/windows-router-auto-restart/releases).
+Setup, how it works, permissions and building from source are in [docs/android.md](docs/android.md).
 
 ## Router compatibility
 
@@ -204,6 +222,7 @@ config/config.example.json    example configuration (placeholders only)
 docs/                         detailed guides
 tests/                        automated tests (simulated router, no real restarts)
 tools/make_icon.py            regenerates assets/router-auto-restart.ico
+android/                      Android companion app: Java sources, tests, toolchain and build scripts
 ```
 
 ## Contributing

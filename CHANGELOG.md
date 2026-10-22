@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.2.0
+
+- New: **Android companion app** (`android/`, guide in `docs/android.md`). It's installed from the
+  release APK and appears on the phone as *Router Auto Restart*. It alerts you when the router is
+  reachable but the internet is down, and restarts the router from the app or from the alert
+  notification. The Windows app is otherwise unchanged.
+  - Checks go out over Wi-Fi explicitly, so mobile data can't hide an outage. Before alerting it
+    re-checks, and it stays quiet after a restart or after the router itself was unreachable.
+  - Same login protocol as the `gx-gpon-e4222` adapter. Tests compare its encoding and checksum
+    against the Windows adapter.
+  - Same restart safety rules: the request is sent once and never retried, there's a 10-minute
+    cooldown, login attempts are limited to 3, and a busy admin session is never retried.
+  - Password encrypted with an Android Keystore key, app backup disabled, no built-in router address.
+  - Built without Gradle from a pinned toolchain (`android/tools/fetch_toolchain.sh`), with
+    reproducible unsigned output. The signing key is git-ignored.
+
 ## 2.1.0 (first public version)
 
 - Packaged as a standalone repository with PowerShell entry points: `Install`, `Configure`,

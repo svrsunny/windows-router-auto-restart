@@ -10,8 +10,8 @@ Include what you found, how to reproduce it, and its impact. Don't include real 
 
 ## Scope
 
-The handling of router credentials, log contents, the scheduled task, and anything that could
-cause unintended or repeated router restarts.
+The handling of router credentials, log contents, the scheduled task, the Android companion app, and anything
+that could cause unintended or repeated router restarts.
 
 ## If you think your router password was exposed
 

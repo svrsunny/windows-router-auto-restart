@@ -6,6 +6,14 @@ config/*.local.json
 .env
 .env.*
 
+# Android signing key and build output - never commit
+android/keystore/
+*.p12
+*.jks
+*.keystore
+*.apk
+*.idsig
+
 # Runtime state and logs
 data/
 logs/

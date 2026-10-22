@@ -56,6 +56,16 @@ There's no telemetry and no update check.
 - Login attempts are bounded (`login_attempts`, default 3). An "admin session already open" response is never retried.
 - `Test-Connection.ps1` and `reboot --dry-run` log in and out but never restart.
 
+## Android companion app
+
+The Android companion app keeps the router password on the phone, encrypted with AES-GCM under a key held
+in the Android Keystore. App backup is disabled. It talks only to the router and to the same three
+probe addresses. Its restart safety rules match the ones above: the request is sent once, there's a
+10-minute cooldown, and login attempts are limited. Details are in [android.md](android.md#security-and-privacy).
+
+The APK signing key (`android/keystore/`) is git-ignored and must never be committed. Anyone holding
+it could sign an "update" that installs over the real app.
+
 ## Before publishing a fork or sharing logs
 
 `config\config.json`, `data\` and `logs\` are git-ignored. Logs contain timestamps and messages
