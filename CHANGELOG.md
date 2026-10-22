@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.1
+
+- Android companion app: now a standard Gradle project (Android Gradle Plugin 9.4, Gradle wrapper
+  9.8 with checksum verification). It builds with `gradlew assembleRelease` or opens in Android
+  Studio, on Windows too. The custom Linux-only toolchain scripts are removed.
+- Android app 2.2.1: no behaviour changes. App data is excluded from Android 12+ cloud backup and
+  device transfer, and the launcher icon supports Android 13 themed icons.
+
 ## 2.2.0
 
 - New: **Android companion app** (`android/`, guide in `docs/android.md`). It's installed from the

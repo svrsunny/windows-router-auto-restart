@@ -13,6 +13,9 @@ android/keystore/
 *.keystore
 *.apk
 *.idsig
+android/.gradle/
+android/local.properties
+.kotlin/
 
 # Runtime state and logs
 data/

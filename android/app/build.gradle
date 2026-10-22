@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Signing key: android/keystore/routerwatch.p12, password in android/keystore/password.txt or the
+// RW_KS_PASS environment variable. Both are git-ignored. Without them the release APK is unsigned.
+def ksFile = rootProject.file('keystore/routerwatch.p12')
+def ksPassFile = rootProject.file('keystore/password.txt')
+def ksPass = System.getenv('RW_KS_PASS') ?: (ksPassFile.exists() ? ksPassFile.text.trim() : null)
+def canSign = ksFile.exists() && ksPass
+
+android {
+    namespace = 'com.sunny.routerwatch'
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = 'com.sunny.routerwatch'
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 3
+        versionName = '2.2.1'
+    }
+
+    // keep the existing folder layout (app/src, app/res, app/AndroidManifest.xml)
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            res.srcDirs = ['res']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    signingConfigs {
+        release {
+            if (canSign) {
+                storeFile = ksFile
+                storeType = 'pkcs12'
+                storePassword = ksPass
+                keyAlias = 'routerwatch'
+                keyPassword = ksPass
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            signingConfig = canSign ? signingConfigs.release : null
+        }
+    }
+}

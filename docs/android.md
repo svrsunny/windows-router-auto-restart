@@ -181,43 +181,57 @@ The app doesn't ask for location, storage, contacts or accounts.
 
 ## Building from source
 
-The APK is built without Android Studio or Gradle, on Linux x86-64 (WSL works on Windows). The script
-needs bash, curl, Python 3 and tar.
+The app is a standard Gradle project in [`android/`](../android) (Android Gradle Plugin 9.4, Gradle
+9.8 via the included wrapper). It has no library dependencies.
 
-```bash
-TC=~/router-watch-toolchain
-android/tools/fetch_toolchain.sh "$TC"            # about 250 MB download; safe to re-run
-android/tools/build.sh "$TC" /tmp/rar-android     # -> /tmp/rar-android/router-auto-restart.apk
+**Requirements:** JDK 17 or later and the Android SDK with platform 34. Android Studio provides both:
+open the `android/` folder in it and build. From a terminal, point `ANDROID_HOME` at the SDK (or
+let Android Studio write `android/local.properties`), then:
+
+```powershell
+cd android
+.\gradlew.bat assembleRelease     # Windows
+./gradlew assembleRelease         # Linux / macOS
 ```
 
-`fetch_toolchain.sh` pins every input to a version, commit or SHA-256:
+The APK is written to `android/app/build/outputs/apk/release/`:
 
-| Tool | Source |
-|---|---|
-| JDK 17 | Eclipse Temurin release from Adoptium |
-| `android.jar` (API 34) | `Reginer/aosp-android-jar` at a pinned commit. Used only to compile against and to link resources; nothing from it goes into the APK. |
-| `aapt2` 2.20 | Linux binary from the npm package `aaptjs3` 2.0.2 |
-| `dx` 1.16 | compiled locally from AOSP source (`aosp-mirror/platform_dalvik`, `android11-release`) |
-| `apksigner` | compiled locally from AOSP `apksig` source (`venshine/apksig` mirror) |
+- `app-release.apk`, signed, if the signing key below is present;
+- `app-release-unsigned.apk` otherwise.
 
-Google's SDK download servers aren't used, which is why these sources were chosen. The resulting
-APK is easy to inspect: one `classes.dex` containing only the app's own classes, the manifest and the
-icons. Given the same toolchain and sources, `unsigned.apk` comes out byte-for-byte identical.
+Other useful tasks:
 
-**Signing.** `build.sh` signs with `android/keystore/routerwatch.p12`, with its password read from
-`android/keystore/password.txt` (or the `RW_KS_PASS` environment variable). Both are git-ignored and
-are never passed on a command line. If neither exists, a new key with a random password is created.
+- `assembleDebug` builds `app-debug.apk`, signed with Android's debug key. It can't be installed over
+  a release build.
+- `lintRelease` runs Android's checks. The few warnings that are intentional are listed in
+  `app/lint.xml`.
+
+The wrapper checks the Gradle download against its published SHA-256
+(`gradle/wrapper/gradle-wrapper.properties`).
+
+**Signing.** Release builds are signed with `android/keystore/routerwatch.p12`, with its password read
+from `android/keystore/password.txt` or the `RW_KS_PASS` environment variable. Both are git-ignored.
 Back them up together: Android only installs an update over an existing app if it's signed with the
 same key. A build signed with a different key has to be installed after uninstalling the old app.
+To create a key for your own fork (keytool asks for the password, so it stays off the command line):
+
+```bash
+keytool -genkeypair -keystore android/keystore/routerwatch.p12 -storetype PKCS12 \
+    -alias routerwatch -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Router Auto Restart"
+```
+
+Then save that password as the only line of `android/keystore/password.txt`.
 
 **Tests.** These run on a PC and need no phone:
 
 ```bash
 mkdir -p /tmp/rw-test
-"$TC/jdk/bin/javac" -encoding UTF-8 -d /tmp/rw-test \
+javac -encoding UTF-8 -d /tmp/rw-test \
     android/app/src/com/sunny/routerwatch/{Net,RouterClient,Probe,Tracker}.java android/tests/TestMain.java
-PATH="$TC/jdk/bin:$PATH" python3 android/tests/run_tests.py /tmp/rw-test src/routerkit/routers/gx_gpon.py
+python3 android/tests/run_tests.py /tmp/rw-test src/routerkit/routers/gx_gpon.py
 ```
+
+They need a JDK 17+ and Python 3 on the `PATH`.
 
 They check that:
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint warnings that are intentional for this app. Everything else is reported as usual. -->
+<lint>
+    <!-- Sideloaded app, not on Google Play; the user confirms the exemption in the system dialog. -->
+    <issue id="BatteryLife" severity="ignore" />
+    <!-- English-only UI built in code; there are no string resources to translate. -->
+    <issue id="SetTextI18n" severity="ignore" />
+    <!-- aapt2 needs the -v26 folder for the adaptive icon even though minSdk is 26. -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="res/mipmap-anydpi-v26" />
+    </issue>
+    <!-- The adaptive icon's background layer is meant to fill the whole square. -->
+    <issue id="IconLauncherShape">
+        <ignore path="res/mipmap-xxxhdpi/ic_launcher_bg.png" />
+    </issue>
+</lint>

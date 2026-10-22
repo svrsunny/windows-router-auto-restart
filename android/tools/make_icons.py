@@ -52,11 +52,7 @@ def write(img, folder, name):
     img.save(out / name)
 
 
-for d, size in {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}.items():
-    tile = render(size, logo._in_rounded_square, BG, identity)
-    tile.alpha_composite(render(size, logo._in_symbol, FG, identity))
-    write(tile, f"mipmap-{d}", "ic_launcher.png")
-
+# minSdk is 26, so only the adaptive icon is needed (no legacy bitmap launcher icons)
 write(Image.new("RGBA", (432, 432), BG + (255,)), "mipmap-xxxhdpi", "ic_launcher_bg.png")
 write(render(432, logo._in_symbol, FG, adaptive), "mipmap-xxxhdpi", "ic_launcher_fg.png")
 (RES / "mipmap-anydpi-v26").mkdir(parents=True, exist_ok=True)
@@ -65,6 +61,7 @@ write(render(432, logo._in_symbol, FG, adaptive), "mipmap-xxxhdpi", "ic_launcher
     '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
     '    <background android:drawable="@mipmap/ic_launcher_bg" />\n'
     '    <foreground android:drawable="@mipmap/ic_launcher_fg" />\n'
+    '    <monochrome android:drawable="@mipmap/ic_launcher_fg" />\n'
     '</adaptive-icon>\n', encoding="utf-8")
 
 for d, size in {"mdpi": 24, "hdpi": 36, "xhdpi": 48, "xxhdpi": 72, "xxxhdpi": 96}.items():

@@ -229,7 +229,7 @@ config/config.example.json    example configuration (placeholders only)
 docs/                         detailed guides
 tests/                        automated tests (simulated router, no real restarts)
 tools/make_icon.py            regenerates assets/router-auto-restart.ico
-android/                      Android companion app: Java sources, tests, toolchain and build scripts
+android/                      Android companion app: Gradle project, Java sources and tests
 ```
 
 ## Contributing
