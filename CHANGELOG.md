@@ -15,6 +15,9 @@
   listed as view-only.
 - Android: router sessions now take turns (the router allows one admin session), and form posts that
   change settings are never silently re-sent.
+- Docs: README section *Wi-Fi clients and blocking*, Android guide, troubleshooting and security notes.
+  New screenshots of the Wi-Fi clients screens, and updated dashboard and Android main-screen
+  screenshots showing the new button (sample data only).
 
 ## 2.2.1
 

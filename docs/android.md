@@ -1,24 +1,27 @@
 # Android companion app
 
 Since version 2.2.0 the project includes a companion app for Android phones. It appears on the phone
-as **Router Auto Restart** and does two things:
+as **Router Auto Restart** and does three things:
 
 1. **Alerts you** when the router answers but the internet doesn't, for example an overnight outage
    that a router restart would fix.
 2. **Restarts the router** with one tap: the **Reboot router** button in the app (with a confirmation),
    or the **Reboot router** button on the alert notification.
+3. **Shows the devices on each Wi-Fi network and blocks or unblocks their internet access** (new in
+   3.0.0). See [Wi-Fi clients](#wi-fi-clients-new-in-300).
 
 It works independently of the Windows app: it doesn't need the PC to be on. You can use either one,
 or both.
 
-| Main screen (dark / light) | Outage alert | Internet back |
-|---|---|---|
-| <img src="images/android-main-dark.png" alt="Main screen in the dark theme" width="200"> <img src="images/android-main-light.png" alt="Main screen in the light theme" width="200"> | <img src="images/android-alert.png" alt="Outage alert notification with a Reboot router button" width="280"> | <img src="images/android-recovered.png" alt="Internet is back notification" width="280"> |
+| Main screen (dark / light) | Wi-Fi clients (3.0.0) | Outage alert | Internet back |
+|---|---|---|---|
+| <img src="images/android-main-dark.png" alt="Main screen in the dark theme" width="180"> <img src="images/android-main-light.png" alt="Main screen in the light theme" width="180"> | <img src="images/android-clients-light.png" alt="Wi-Fi clients screen: devices by SSID with Block and Unblock buttons" width="180"> | <img src="images/android-alert.png" alt="Outage alert notification with a Reboot router button" width="260"> | <img src="images/android-recovered.png" alt="Internet is back notification" width="260"> |
 
 - [Requirements](#requirements)
 - [Install](#install)
 - [Set up](#set-up)
 - [Test the alert](#test-the-alert)
+- [Wi-Fi clients (new in 3.0.0)](#wi-fi-clients-new-in-300)
 - [How it works](#how-it-works)
 - [Permissions](#permissions)
 - [Security and privacy](#security-and-privacy)
@@ -85,6 +88,26 @@ Turn on **Simulate an outage** at the bottom of the app. Within about 15 seconds
 *No internet at home (test)* alert. Turn the switch off and you get *Internet is back*.
 
 > The **Reboot router** button on the test alert is real: it restarts the router.
+
+## Wi-Fi clients (new in 3.0.0)
+
+Tap **Wi-Fi clients** on the main screen. The app logs in to the router over Wi-Fi and lists the
+devices on each SSID with their name, MAC address, IP address and signal. Tap **Refresh** to read it
+again.
+
+- **Block** asks for confirmation, then cuts that device's internet access. The device stays on
+  Wi-Fi, and no other device is disconnected. **Unblock** gives it back. After each change the app
+  reads the router's rule table again and shows the result, or an error if the router didn't keep
+  the change.
+- A block is a Parental Control rule on the router named `RC-<mac>`, for every day from 00:00 to
+  23:59. Blocks made from the Windows app and from the phone are the same rules, so either app can
+  undo the other's. Rules you made yourself in the router's web page are never changed.
+- Devices on the router's extra (virtual) SSIDs are listed as view-only: the router's block doesn't
+  apply there. Devices the router counts but doesn't name (fixed IP address) appear as a count.
+- A blocked device that isn't connected is listed under *Blocked, not connected now*, so you can still
+  unblock it.
+- The router allows one admin session at a time. If its web page is open in a browser, or the
+  Windows app is using it, the app says so. Try again when it's free.
 
 ## How it works
 
@@ -153,7 +176,8 @@ The app doesn't ask for location, storage, contacts or accounts.
   is `http://`. The login then travels unencrypted on your local network, as it does from a browser.
   If the router uses `https://`, certificates are verified normally and there is no way to turn that off.
 - **Network.** The app talks only to your router and to the three probe addresses above. There's no
-  telemetry, no analytics, no ads and no update check.
+  telemetry, no analytics, no ads and no update check. The Wi-Fi client list is read from the router
+  when you open it and isn't stored.
 - **Code.** Plain Java with no third-party libraries. The source is in [`android/`](../android).
 
 ## Limitations
@@ -166,6 +190,8 @@ The app doesn't ask for location, storage, contacts or accounts.
   at the same address, an outage there can also trigger an alert. A restart from there fails at the
   login unless the password happens to be the same.
 - Checks are delayed while the phone is idle (see [Timing](#how-it-works)).
+- Blocking works only on the main SSIDs, and follows the router's clock (see
+  [Wi-Fi clients](#wi-fi-clients-new-in-300) and [router compatibility](router-compatibility.md)).
 
 ## Troubleshooting
 

@@ -56,6 +56,16 @@ There's no telemetry and no update check.
 - Login attempts are bounded (`login_attempts`, default 3). An "admin session already open" response is never retried.
 - `Test-Connection.ps1` and `reboot --dry-run` log in and out but never restart.
 
+## Wi-Fi clients and blocking (3.0.0)
+
+- Listing clients only reads router pages. It changes nothing, and the list isn't saved.
+- Block and Unblock change only Parental Control rules named `RC-<mac>`, plus the Parental Control
+  switch. Rules you created yourself are never edited or deleted, and the switch is turned off
+  only when no rules at all are left. Every change is checked by reading the rule table back.
+- Requests that change settings are never re-sent automatically.
+- Blocks and unblocks are recorded in `logs\events.jsonl` with the device's MAC address. Treat the
+  log as private, like any list of your devices.
+
 ## Android companion app
 
 The Android companion app keeps the router password on the phone, encrypted with AES-GCM under a key held

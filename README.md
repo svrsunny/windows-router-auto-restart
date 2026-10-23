@@ -2,7 +2,8 @@
 
 Scheduled restarts for home routers that can't restart themselves on a schedule, driven from a
 Windows PC. It includes a countdown window that lets you postpone or skip a restart, an internet
-watchdog, a dashboard and, since 2.2.0, an Android companion app.
+watchdog, a dashboard and, since 2.2.0, an Android companion app. **New in 3.0.0:** see the devices on
+each Wi-Fi network and block or unblock their internet access, from the PC or the phone.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
@@ -33,6 +34,50 @@ interface, exactly as you would in a browser, and presses its restart button for
 - **Credentials** are stored in Windows Credential Manager. They never go in files, logs, task arguments or URLs.
 - **Android companion app (optional, new in 2.2.0):** alerts on your phone when the router is up but
   the internet is down, and restarts the router with one tap. See [Android companion app](#android-companion-app).
+- **Wi-Fi clients and internet blocking (new in 3.0.0):** lists the devices on each SSID and blocks or
+  unblocks a device's internet access with one click, on the PC and on the phone. See
+  [Wi-Fi clients and blocking](#wi-fi-clients-and-blocking-new-in-300).
+
+## Wi-Fi clients and blocking (new in 3.0.0)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/clients-dark.png">
+  <img src="docs/images/clients-light.png" alt="Wi-Fi clients window: devices grouped by SSID with name, MAC address, IP address and signal, Block and Unblock buttons, a blocked device marked Blocked, and view-only extra SSIDs" width="460">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/android-clients-dark.png">
+  <img src="docs/images/android-clients-light.png" alt="Android Wi-Fi clients screen with the same devices, Block and Unblock buttons" width="250">
+</picture>
+
+- **See who's connected.** Devices are grouped under each SSID (Wi-Fi network name) with their name,
+  MAC address, IP address and signal strength. Devices the router counts but doesn't name, for example
+  ones with a fixed IP address, are shown as a count instead of being guessed.
+- **Block / Unblock** cuts a device's internet access, or gives it back, in a few seconds. The device
+  stays connected to Wi-Fi, and nobody else is disconnected. A device that's blocked but offline is
+  still listed, so you can always unblock it.
+- **Where:** the **Wi-Fi clients** button on the dashboard, the **Wi-Fi clients** button in the Android
+  app, or the command line:
+
+  ```powershell
+  .\.venv\Scripts\python.exe src\routerctl.py clients                     # devices by SSID
+  .\.venv\Scripts\python.exe src\routerctl.py block 00:00:5e:00:53:12     # cut its internet
+  .\.venv\Scripts\python.exe src\routerctl.py unblock 00:00:5e:00:53:12   # give it back
+  ```
+
+**How it works.** The app uses the router's own Parental Control. A block is a rule for the device's
+MAC address that applies every day from 00:00 to 23:59, named `RC-<mac>`. Rules you created in the
+router's web page are never changed, and Parental Control is switched off again only when no rules
+are left. After every change the app reads the rule table back from the router, and reports an
+error if the change didn't take effect.
+
+**Limitations** (GX GPON E4222, checked on a real router):
+
+- Blocking works on each band's **main** SSID. The router's block doesn't apply to its extra (virtual)
+  SSIDs, so devices there are listed as view-only.
+- The router allows one admin session at a time. If you're logged in to its web page in a browser,
+  close that first.
+- The rule follows the router's clock. If that clock is wrong, there can be about a minute a day,
+  around midnight by the router's clock, when the block isn't applied.
 
 ## Screenshots
 
@@ -42,7 +87,8 @@ interface, exactly as you would in a browser, and presses its restart button for
 | **Editing the schedule** | **Light theme** |
 | <img src="docs/images/schedule-dialog.png" alt="Schedule dialog with restart time, interval in days and countdown length" width="330"> | <img src="docs/images/dashboard-light.png" alt="Dashboard in the light theme" width="400"> |
 
-*The screenshots use sample data and documentation addresses (192.0.2.1, 198.51.100.23).*
+*The screenshots use sample data and documentation addresses (192.0.2.1, 198.51.100.23,
+00:00:5e:00:53:xx). The Wi-Fi client lists come from the project's simulated router.*
 
 **Limitations:** Windows 10/11 only. One verified router model. The scheduled task runs only while
 you're logged on, because the countdown appears on your desktop. If the PC is off or asleep at the
@@ -58,14 +104,17 @@ the router answers but the internet doesn't. When that happens you get a notific
 - Works on its own. The Windows app doesn't need to be running.
 - Same login protocol and restart safety rules as the Windows app: the restart is sent once, never
   retried, and refused for 10 minutes after one was sent.
+- **New in 3.0.0:** a **Wi-Fi clients** screen lists the devices on each SSID and blocks or unblocks
+  their internet access, the same way as the Windows app (see [above](#wi-fi-clients-and-blocking-new-in-300)).
 - The password is encrypted with a key in the Android Keystore. No telemetry, no third-party libraries.
 
-| Main screen | Outage alert | Internet back |
-|---|---|---|
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/android-main-dark.png"><img src="docs/images/android-main-light.png" alt="Android app main screen: Internet OK status, Reboot router button, alert switch, router login and Keep it running sections" width="250"></picture> | <img src="docs/images/android-alert.png" alt="Notification: No internet at home (test), router reachable but internet down since 09:33, with a Reboot router button" width="300"> | <img src="docs/images/android-recovered.png" alt="Notification: Internet is back, it was down for less than a minute" width="300"> |
+| Main screen | Wi-Fi clients (new in 3.0.0) | Outage alert | Internet back |
+|---|---|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/android-main-dark.png"><img src="docs/images/android-main-light.png" alt="Android app main screen: Internet OK status, Reboot router button, alert switch, Check now, Test login and Wi-Fi clients buttons, router login and Keep it running sections" width="220"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/android-clients-dark.png"><img src="docs/images/android-clients-light.png" alt="Android Wi-Fi clients screen: devices by SSID with Block and Unblock buttons" width="220"></picture> | <img src="docs/images/android-alert.png" alt="Notification: No internet at home (test), router reachable but internet down since 09:33, with a Reboot router button" width="260"> | <img src="docs/images/android-recovered.png" alt="Notification: Internet is back, it was down for less than a minute" width="260"> |
 
-*Android screenshots are from a real phone, with the status bar cropped out. The alert was triggered
-with the app's Simulate an outage switch.*
+*The notification screenshots are from a real phone, with the status bar cropped out; the alert was
+triggered with the app's Simulate an outage switch. The 3.0.0 screens are from the Android emulator,
+and the client list comes from the project's simulated router with sample devices.*
 
 Download `router-auto-restart-<version>.apk` from the project's
 [Releases](https://github.com/svrsunny/windows-router-auto-restart/releases).
@@ -75,7 +124,7 @@ Setup, how it works, permissions and building from source are in [docs/android.m
 
 | `router_model` | Device | Firmware | Status |
 |---|---|---|---|
-| `gx-gpon-e4222` | GX GPON ONT (web UI with captcha and `postSecurityFlag` checksum) | E4222-3.0.5-R | Verified on one device: login, dry run, restart, recovery |
+| `gx-gpon-e4222` | GX GPON ONT (web UI with captcha and `postSecurityFlag` checksum) | E4222-3.0.5-R | Verified on one device: login, dry run, restart, recovery; Wi-Fi client list, internet block and unblock (3.0.0) |
 
 Other routers need an adapter. See [docs/router-compatibility.md](docs/router-compatibility.md).
 
@@ -191,7 +240,7 @@ so the pinned icon and the open window share one button.
 ## Logs and troubleshooting
 
 - `logs\router-auto-restart.log` is the human-readable activity log. Passwords are never written, and redacted if they ever appear.
-- `logs\events.jsonl` is the structured history (restarts, login tests, outages) behind the dashboard's uptime figures.
+- `logs\events.jsonl` is the structured history (restarts, login tests, outages, blocks and unblocks) behind the dashboard's uptime figures.
 - `.\.venv\Scripts\python.exe src\routerctl.py status` prints a one-screen summary.
 
 Common problems and exit codes are covered in [docs/troubleshooting.md](docs/troubleshooting.md).
@@ -220,10 +269,10 @@ src/routerctl.py              command line (all scripts call this)
 src/RouterControl.pyw         double-click launcher for the dashboard
 src/routerkit/                the application
   routers/                    one adapter per router model (+ template.py)
-  actions.py                  restart, recovery check, diagnostics, duplicate protection
+  actions.py                  restart, recovery check, diagnostics, duplicate protection, client list and blocking
   scheduler.py                Windows Task Scheduler integration
   credentials.py              Windows Credential Manager access
-  ui/                         dashboard, countdown window, watchdog pop-up
+  ui/                         dashboard, countdown window, watchdog pop-up, Wi-Fi clients window
 scripts/                      PowerShell entry points (Install, Configure, Test, Restart, Register, Remove, Shortcut, Uninstall)
 config/config.example.json    example configuration (placeholders only)
 docs/                         detailed guides

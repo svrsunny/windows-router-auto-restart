@@ -68,6 +68,20 @@ Shortcuts to `.py` or `.pyw` files can't be pinned. Run `.\scripts\New-Shortcut.
 **Dashboard says "Watchdog: Not running"**
 Click *Start*, or register it with `Register-ScheduledTask.ps1 -WithWatchdog`.
 
+**Wi-Fi clients: a device I blocked still has internet**
+Check which SSID it's on. The block applies on each band's main SSID, not on the router's extra
+(virtual) SSIDs, which are listed as view-only. Also check the phone or laptop isn't using mobile
+data. The rule follows the router's own clock, so a wrong router time can leave a short gap.
+
+**Wi-Fi clients: "the router did not keep the block" / "did not remove the block"**
+The router answered but its Parental Control table doesn't show the change. Nothing else was
+changed. Open the router's *Parental Control* page to look, then try again. Rules the app made are
+named `RC-<mac>`.
+
+**Wi-Fi clients: a network shows "the router reports N devices … that it doesn't list"**
+Those devices aren't in the router's DHCP list, usually because they use a fixed IP address. The
+router only reports how many there are.
+
 **Test the watchdog pop-up without an outage**
 Create the file `data\force_down.flag` while the watchdog runs (the internet then counts as down)
 and delete it to end the test. To see the pop-ups only: `.\.venv\Scripts\python.exe src\routerctl.py watchdog --demo`.
