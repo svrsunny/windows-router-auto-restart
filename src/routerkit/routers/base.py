@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 
 import requests
 
@@ -21,6 +22,43 @@ class AuthError(RouterError):
 
 class SessionBusyError(RouterError):
     """The router allows one admin session and another one is open."""
+
+
+MAC_RE = re.compile(r"^(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$")
+
+
+def norm_mac(mac: str) -> str:
+    """'00-00-5E-00-53-01' / '00005e005301' -> '00:00:5e:00:53:01'; raises ValueError if it isn't one."""
+    mac = (mac or "").strip()
+    if not (MAC_RE.match(mac) or re.fullmatch(r"[0-9a-fA-F]{12}", mac)):
+        raise ValueError(f"not a MAC address: {mac!r}")
+    hexes = re.sub(r"[^0-9a-fA-F]", "", mac)
+    return ":".join(hexes[i:i + 2] for i in range(0, 12, 2)).lower()
+
+
+@dataclass
+class WifiClient:
+    mac: str                 # aa:bb:cc:dd:ee:ff, lower case
+    name: str = ""           # host name from the router's DHCP table ("" if unknown)
+    ip: str = ""
+    rssi: str = ""
+    blocked: bool = False    # this app's internet block is on for the device
+
+
+@dataclass
+class Ssid:
+    name: str
+    band: str                # "2.4 GHz" or "5 GHz"
+    can_block: bool          # the router's block applies to devices on this SSID
+    clients: list = field(default_factory=list)
+    reported: int = 0        # devices the router counts on this SSID (may be more than it lists)
+
+
+@dataclass
+class ClientList:
+    ssids: list              # [Ssid]
+    unknown: list            # [WifiClient] on Wi-Fi, but the SSID could not be told apart
+    blocked_offline: list    # [WifiClient] blocked by this app and not connected right now
 
 
 class RouterAdapter:
@@ -68,6 +106,15 @@ class RouterAdapter:
 
     def logout(self) -> None:
         raise NotImplementedError
+
+    # ---- optional: connected clients and internet blocking (call after login) ----
+    def list_clients(self) -> ClientList:
+        raise RouterError(f"{self.display_name}: listing clients is not supported")
+
+    def set_blocked(self, mac: str, blocked: bool) -> None:
+        """Block or unblock the device's internet access. Raises RouterError if the router did not
+        take the change."""
+        raise RouterError(f"{self.display_name}: blocking clients is not supported")
 
 
 def short_error(e: Exception) -> str:

@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.0.0
+
+- New: **Wi-Fi clients**, in the Windows dashboard (*Wi-Fi clients* button, or `routerctl.py clients`)
+  and in the Android app (*Wi-Fi clients* button). Devices are listed under each SSID with name, IP
+  address and signal. A device whose SSID the router doesn't report clearly is listed as
+  "network not known" instead of being guessed.
+- New: **Block / Unblock** a device's internet access (`routerctl.py block|unblock MAC` too). It adds
+  or removes a Parental Control rule for the device's MAC address (every day, 00:00-23:59). The
+  device stays on Wi-Fi, and other devices aren't disconnected. Rules are named `RC-<mac>`. Rules
+  you made in the router's own page are never changed, and Parental Control is switched off again
+  only when no rules are left. Each change is checked by reading the rule table back.
+- On the GX GPON E4222 the block doesn't apply to the extra (virtual) SSIDs, so devices there are
+  listed as view-only.
+- Android: router sessions now take turns (the router allows one admin session), and form posts that
+  change settings are never silently re-sent.
+
 ## 2.2.1
 
 - Android companion app: now a standard Gradle project (Android Gradle Plugin 9.4, Gradle wrapper

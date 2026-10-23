@@ -26,6 +26,34 @@ Session handling: the router sets a session cookie, which the HTTP session keeps
 separate CSRF token. If another admin session is open, the router answers "you have logined" and
 the attempt stops without retrying.
 
+Wi-Fi clients and internet blocking (checked on the same device):
+
+1. `GET /boaform/formWlanRedirect?redirect-url=/wlstatus.asp&wlan_idx=N` (N = 0 for 5 GHz, 1 for
+   2.4 GHz). The script on the page has the main SSID, the extra SSIDs (`mssid_*`) and a client count
+   for each. The request also selects radio N for the session.
+2. `GET /boaform/admin/formWirelessTbl?submit-url=/admin/wlstatbl.asp`. Stations on the main SSID of
+   **the radio selected in step 1**. The router ignores a `wlan_idx` on this request, so step 1 must
+   come first for each radio.
+3. `GET /status_client_list.asp`. DHCP leases with MAC, IP, host name, band and signal. There's no
+   page listing the extra SSIDs' stations. A device on a band that isn't on its main SSID is
+   assigned to the extra SSID only when that radio has exactly one extra SSID and the router's
+   count for it matches.
+4. Block: `POST /boaform/admin/formParentCtrl`, first `parental_ctrl_on=1` (switch on) if needed,
+   then a rule `usrname=RC-<mac>&specPC=1&mac=<12 hex>&Sun=on…&Sat=on&starthr=00&startmin=00&endhr=23&endmin=59&addfilterMac=Add`.
+   Unblock: `select<N>=ON&deleteSelFilterMac=Delete+Selected` for that rule's row, then
+   `parental_ctrl_on=0` when the table is empty. Every body ends with `submit-url=%2Fparental-ctrl.asp`
+   and `postSecurityFlag`. `GET /parental-ctrl.asp` gives the switch and rule table.
+
+What was observed on the real router:
+
+- Parental Control cut internet access on the main 5 GHz SSID within seconds, and the device stayed
+  on Wi-Fi. Saving rules didn't disconnect other devices. It did **not** cut access on the extra
+  (virtual) SSID, so devices there are view-only.
+- WLAN Access Control (MAC deny list, `formWlAc`) is **not** used. It applies only to a radio's
+  main SSID, and every save restarts that radio, dropping all its devices for about 6.5 s.
+- The router's clock runs about 27% fast and its time sync didn't correct it. The all-day rule
+  leaves a gap of about a minute between 23:59 and 00:00 router time, whenever that falls.
+
 ## Adding a router
 
 You'll need a browser and your own router. **Never share captured passwords, cookies or tokens.**

@@ -204,6 +204,12 @@ public final class MainActivity extends Activity {
             }
         }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         add(root, row, 8);
+        add(root, button("Wi-Fi clients", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, ClientsActivity.class));
+            }
+        }), 4);
 
         add(root, text("Router login", 18, true), 28);
         urlEdit = edit("Router address, e.g. http://192.168.1.1",

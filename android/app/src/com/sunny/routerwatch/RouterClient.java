@@ -12,6 +12,12 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.Semaphore;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,8 +26,15 @@ import java.util.regex.Pattern;
  * Same flow as the PC adapter (src/routerkit/routers/gx_gpon.py):
  * GET login.asp -> read the captcha text from the page source -> compute postSecurityFlag
  * -> POST formLogin -> POST formReboot (or formLogout).
+ * Wi-Fi clients and internet blocking (Parental Control rules) follow the same adapter; see its
+ * docstring for the pages used.
+ *
+ * Only one client exists at a time (the router allows one admin session, and the cookie jar is
+ * process-wide): the constructor waits for the previous one to be closed. Always close().
  */
 public final class RouterClient implements AutoCloseable {
+
+    private static final Semaphore ONE_SESSION = new Semaphore(1);
 
     public static class RouterException extends Exception {
         public RouterException(String message) {
@@ -47,8 +60,10 @@ public final class RouterClient implements AutoCloseable {
     private final int timeoutMs;
     private boolean loggedIn;
     private boolean rebooted;
+    private boolean closed;
 
     public RouterClient(String baseUrl, String username, String password, Net net, int timeoutMs) {
+        ONE_SESSION.acquireUninterruptibly();
         String b = baseUrl.trim();
         while (b.endsWith("/")) {
             b = b.substring(0, b.length() - 1);
@@ -98,12 +113,19 @@ public final class RouterClient implements AutoCloseable {
         return (~s) & 0xFFFF;
     }
 
-    public static String buildLoginBody(String user, String password, String captcha) {
-        String body = "challenge=&username=" + enc(user)
-                + "&password=" + enc(password)
-                + "&captchaTextBox=" + enc(captcha)
-                + "&save=Login&submit-url=" + enc("/admin/login.asp") + "&";
+    /** A form post as the router's pages send it: the fields in page order, then postSecurityFlag. */
+    public static String formBody(String[][] fields) {
+        StringBuilder b = new StringBuilder();
+        for (String[] f : fields) {
+            b.append(f[0]).append('=').append(enc(f[1])).append('&');
+        }
+        String body = b.toString();
         return body + "postSecurityFlag=" + postSecurityFlag(body);
+    }
+
+    public static String buildLoginBody(String user, String password, String captcha) {
+        return formBody(new String[][]{{"challenge", ""}, {"username", user}, {"password", password},
+                {"captchaTextBox", captcha}, {"save", "Login"}, {"submit-url", "/admin/login.asp"}});
     }
 
     // ---------- HTTP ----------
@@ -158,6 +180,7 @@ public final class RouterClient implements AutoCloseable {
             c.setDoOutput(true);
             if (streamed) {
                 c.setFixedLengthStreamingMode(data.length);
+                c.setInstanceFollowRedirects(false);   // a streamed body can't be re-sent to the new location
             }
             c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
             c.setRequestProperty("Origin", base);
@@ -233,10 +256,135 @@ public final class RouterClient implements AutoCloseable {
         }
     }
 
+    // ---------- Wi-Fi clients and internet blocking (call after login) ----------
+
+    private static final String PARENTAL = "/parental-ctrl.asp";
+    private static final String[] DAYS = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+
+    private String page(String path) throws RouterException {
+        String what = path.split("\\?")[0];
+        String r;
+        try {
+            r = get(path);
+        } catch (IOException e) {
+            throw new RouterException("Couldn't load " + what + " (" + shortError(e) + ").");
+        }
+        if (CAPTCHA.matcher(r).find() && r.contains("formLogin")) {
+            throw new RouterException("The router ended the admin session.");
+        }
+        return r;
+    }
+
+    private void postParental(String[][] fields) throws RouterException {
+        try {
+            // streamed: never silently re-sent - a repeated delete would hit the renumbered row
+            post("/boaform/admin/formParentCtrl", formBody(fields), PARENTAL, timeoutMs, true);
+        } catch (IOException e) {
+            throw new RouterException("The Parental Control request failed (" + shortError(e) + ").");
+        }
+    }
+
+    public Clients listClients() throws RouterException {
+        List<Clients.Radio> radios = new ArrayList<>();
+        List<List<String>> stations = new ArrayList<>();
+        for (int idx = 0; idx <= 1; idx++) {
+            // the station table answers for the radio the redirect selected, so keep this order
+            radios.add(Clients.parseRadio(page("/boaform/formWlanRedirect?redirect-url=/wlstatus.asp&wlan_idx=" + idx)));
+            stations.add(Clients.parseStations(
+                    page("/boaform/admin/formWirelessTbl?submit-url=/admin/wlstatbl.asp&wlan_idx=" + idx)));
+        }
+        List<Clients.Lease> dhcp = Clients.parseDhcp(page("/status_client_list.asp"));
+        String pc = page(PARENTAL);
+        Set<String> blocked = new HashSet<>();
+        if (Clients.parentalOn(pc)) {
+            for (Clients.Rule r : Clients.parseRules(pc)) {
+                if (!r.mac.isEmpty() && r.name.startsWith(Clients.RULE_PREFIX)) {
+                    blocked.add(r.mac);
+                }
+            }
+        }
+        return Clients.build(radios, stations, dhcp, blocked);
+    }
+
+    private static List<Clients.Rule> mine(List<Clients.Rule> rules, String mac) {
+        List<Clients.Rule> out = new ArrayList<>();
+        for (Clients.Rule r : rules) {
+            if (r.mac.equals(mac) && r.name.startsWith(Clients.RULE_PREFIX)) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    /** Block or unblock the device's internet access; checks the router kept the change. */
+    public void setBlocked(String rawMac, boolean blocked) throws RouterException {
+        String mac;
+        try {
+            mac = Clients.normMac(rawMac);
+        } catch (IllegalArgumentException e) {
+            throw new RouterException(e.getMessage());
+        }
+        String pc = page(PARENTAL);
+        boolean on = Clients.parentalOn(pc);
+        List<Clients.Rule> rules = Clients.parseRules(pc);
+        if (blocked) {
+            if (!on) {
+                postParental(new String[][]{{"parental_ctrl_on", "1"}, {"parentalCtrlSet", "Apply Changes"},
+                        {"submit-url", PARENTAL}});
+            }
+            if (mine(rules, mac).isEmpty()) {
+                List<String[]> f = new ArrayList<>();
+                f.add(new String[]{"usrname", Clients.ruleName(mac)});
+                f.add(new String[]{"specPC", "1"});
+                f.add(new String[]{"mac", mac.replace(":", "").toUpperCase(Locale.ROOT)});
+                for (String d : DAYS) {
+                    f.add(new String[]{d, "on"});
+                }
+                f.add(new String[]{"starthr", "00"});
+                f.add(new String[]{"startmin", "00"});
+                f.add(new String[]{"endhr", "23"});
+                f.add(new String[]{"endmin", "59"});
+                f.add(new String[]{"addfilterMac", "Add"});
+                f.add(new String[]{"submit-url", PARENTAL});
+                postParental(f.toArray(new String[0][]));
+            }
+            pc = page(PARENTAL);
+            if (!Clients.parentalOn(pc) || mine(Clients.parseRules(pc), mac).isEmpty()) {
+                throw new RouterException("The router did not keep the block. Nothing changed.");
+            }
+            return;
+        }
+        int tries = mine(rules, mac).size();
+        for (int i = 0; i < tries && !mine(rules, mac).isEmpty(); i++) {
+            // one at a time: deleting renumbers the checkboxes
+            postParental(new String[][]{{mine(rules, mac).get(0).select, "ON"},
+                    {"deleteSelFilterMac", "Delete Selected"}, {"submit-url", PARENTAL}});
+            pc = page(PARENTAL);
+            on = Clients.parentalOn(pc);
+            rules = Clients.parseRules(pc);
+        }
+        if (!mine(rules, mac).isEmpty()) {
+            throw new RouterException("The router did not remove the block.");
+        }
+        if (on && rules.isEmpty()) {
+            // nothing else uses Parental Control: switch it back off
+            postParental(new String[][]{{"parental_ctrl_on", "0"}, {"parentalCtrlSet", "Apply Changes"},
+                    {"submit-url", PARENTAL}});
+        }
+    }
+
     @Override
     public void close() {
-        if (loggedIn && !rebooted) {
-            logout();
+        if (closed) {
+            return;
+        }
+        closed = true;
+        try {
+            if (loggedIn && !rebooted) {
+                logout();
+            }
+        } finally {
+            ONE_SESSION.release();
         }
     }
 

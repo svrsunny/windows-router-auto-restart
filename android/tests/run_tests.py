@@ -33,7 +33,7 @@ def report(ok, what):
 src = open(PC_SCRIPT, encoding="utf-8").read()
 tree = ast.parse(src)
 ns = {"quote_plus": quote_plus}
-wanted = {"enc", "_int32", "post_security_flag", "build_login_body"}
+wanted = {"enc", "_int32", "post_security_flag", "form_body", "build_login_body"}
 code = ast.Module(body=[n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in wanted], type_ignores=[])
 exec(compile(code, PC_SCRIPT, "exec"), ns)
 assert wanted <= set(ns), "protocol functions not found in " + PC_SCRIPT
@@ -103,6 +103,87 @@ scenario("wrong password", mock_router.Router(flag), "admin", "nope", "reboot", 
 scenario("unicode password", mock_router.Router(flag, password="pässwörd€ 1~"), "admin", "pässwörd€ 1~", "reboot",
          "ok", ["login_ok", "reboot"])
 scenario("session busy", mock_router.Router(flag, busy=True), "admin", "p@ss w0rd~*", "reboot", "busy", ["busy"])
+
+PHONE, PC, LAPTOP = mock_router.PHONE, mock_router.PC, mock_router.LAPTOP
+rule = lambda mac: ("RC-" + mac.replace(":", ""), mac.replace(":", "-"))  # noqa: E731
+scenario("block: switch on + all-day rule", mock_router.Router(flag), "admin", "p@ss w0rd~*", "block:" + PHONE.upper(),
+         "ok", ["login_ok", "pc_on", "add:RC-00005e005301", "logout"])
+scenario("block twice: no second rule", mock_router.Router(flag, parental_on=True, rules=[rule(PHONE)]), "admin",
+         "p@ss w0rd~*", "block:" + PHONE, "ok", ["login_ok", "logout"])
+scenario("unblock last rule: switch off", mock_router.Router(flag, parental_on=True, rules=[rule(PHONE)]), "admin",
+         "p@ss w0rd~*", "unblock:" + PHONE, "ok", ["login_ok", "del:RC-00005e005301", "pc_off", "logout"])
+scenario("unblock keeps hand-made rules", mock_router.Router(flag, parental_on=True,
+                                                             rules=[("kids-tv", PHONE.replace(":", "-")), rule(PHONE)]),
+         "admin", "p@ss w0rd~*", "unblock:" + PHONE, "ok", ["login_ok", "del:RC-00005e005301", "logout"])
+scenario("bad MAC refused", mock_router.Router(flag), "admin", "p@ss w0rd~*", "block:nope", "error not a MAC",
+         ["login_ok", "logout"])
+
+# 3b. Wi-Fi clients: Java and the PC adapter group the same pages the same way
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(PC_SCRIPT)))))
+from routerkit.routers import gx_gpon  # noqa: E402
+
+
+def py_dump(cl):
+    out = []
+    row = lambda c: "C|%s|%s|%s|%s|%d" % (c.mac, c.name, c.ip, c.rssi, c.blocked)  # noqa: E731
+    for s in cl.ssids:
+        out.append("SSID|%s|%s|%d|%d" % (s.name, s.band, s.can_block, s.reported))
+        out += [row(c) for c in s.clients]
+    out.append("UNKNOWN")
+    out += [row(c) for c in cl.unknown]
+    out.append("OFFLINE")
+    out += [row(c) for c in cl.blocked_offline]
+    return "\n".join(out) + "\n"
+
+
+def py_group(pages):
+    radios = [gx_gpon.parse_radio(pages["radio%d" % i]) for i in (0, 1)]
+    stations = [gx_gpon.parse_stations(pages["tbl%d" % i]) for i in (0, 1)]
+    on, rules = gx_gpon.parse_parental(pages["parental"])
+    blocked = {r["mac"] for r in rules if on and r["mac"] and r["name"].startswith("RC-")}
+    return py_dump(gx_gpon.build_clients(radios, stations, gx_gpon.parse_dhcp(pages["dhcp"]), blocked))
+
+
+macs = ["00:00:5e:00:53:%02x" % i for i in range(1, 9)]
+names = ["phone", "pc", "----", "Tv &amp; box", "", "work-laptop", "a b", "x"]
+mism = 0
+for case in range(60):
+    r = random.Random(case)
+    leased = r.sample(macs, r.randint(0, 6))
+    leases = [((m.upper() if r.random() < 0.5 else m), "192.0.2.%d" % (10 + i), r.choice(names),
+               r.choice(["5GHz", "2.4GHz", "LAN"]), r.choice(["-56", "----"])) for i, m in enumerate(leased)]
+    st0 = r.sample(macs, r.randint(0, 3))
+    st1 = r.sample([m for m in macs if m not in st0], r.randint(0, 2))
+    on = r.random() < 0.7
+    rules = [(("RC-" if r.random() < 0.7 else "hand-") + m.replace(":", ""), m.replace(":", "-"))
+             for m in r.sample(macs, r.randint(0, 3))]
+    pages = {"radio0": mock_router.wlstatus(2, "Home 5G", "Work-5G", r.randint(0, 3), main_disabled=int(r.random() < 0.1)),
+             "radio1": mock_router.wlstatus(1, "Home-2G", "Work-2G", r.randint(0, 2)),
+             "tbl0": mock_router.wlstatbl(st0), "tbl1": mock_router.wlstatbl(st1),
+             "dhcp": mock_router.dhcp(leases), "parental": mock_router.parental(on, rules)}
+    d = tempfile.mkdtemp(prefix="rc-pages-")
+    for k, v in pages.items():
+        with open(os.path.join(d, k + ".html"), "w", encoding="utf-8") as f:
+            f.write(v)
+    rc, out, err = run_java("group", d)
+    exp = py_group(pages)
+    if rc != 0 or out != exp:
+        mism += 1
+        if mism < 3:
+            print("  case %d differs:\n--- java\n%s%s--- pc\n%s" % (case, out, err[-300:], exp))
+report(mism == 0, "Wi-Fi client grouping identical to the PC adapter (60 page sets)")
+
+srv = mock_router.serve(mock_router.Router(flag, parental_on=True, rules=[rule(PHONE)]))
+rc, out, err = run_java("client", "http://127.0.0.1:%d/" % srv.server_address[1], "admin", "p@ss w0rd~*", "list")
+srv.shutdown()
+expected = py_group({"radio0": mock_router.wlstatus(2, "Home-5G", "Home-Work-5G", 1),
+                     "radio1": mock_router.wlstatus(1, "Home-2G", "Home-Work-2G", 0),
+                     "tbl0": mock_router.wlstatbl([PHONE.upper(), PC]), "tbl1": mock_router.wlstatbl([]),
+                     "dhcp": mock_router.dhcp(mock_router.Router(flag).leases),
+                     "parental": mock_router.parental(True, [rule(PHONE)])})
+report(out == expected + "RESULT ok\n", "list over HTTP: radio selected before its station table, phone blocked")
+if out != expected + "RESULT ok\n":
+    print(out, err[-500:])
 
 # 4. router unreachable
 rc, out, err = run_java("client", "http://127.0.0.1:9/", "admin", "x", "reboot")

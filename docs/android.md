@@ -227,7 +227,7 @@ Then save that password as the only line of `android/keystore/password.txt`.
 ```bash
 mkdir -p /tmp/rw-test
 javac -encoding UTF-8 -d /tmp/rw-test \
-    android/app/src/com/sunny/routerwatch/{Net,RouterClient,Probe,Tracker}.java android/tests/TestMain.java
+    android/app/src/com/sunny/routerwatch/{Net,RouterClient,Probe,Tracker,Clients}.java android/tests/TestMain.java
 python3 android/tests/run_tests.py /tmp/rw-test src/routerkit/routers/gx_gpon.py
 ```
 
@@ -240,7 +240,9 @@ They check that:
 - the alert logic gives the right result in outage, restart, power-cut, cooldown and away-from-home
   scenarios;
 - the app logs in, restarts, logs out and reports errors correctly against a simulated router. The
-  simulated router drops the connection on restart, may redirect after login, and allows one session.
+  simulated router drops the connection on restart, may redirect after login, and allows one session;
+- the app groups Wi-Fi clients by SSID exactly like the Windows adapter (60 generated page sets), and
+  blocks / unblocks with the right Parental Control requests, leaving hand-made rules alone.
 
 **Icons** are generated from the project logo in `tools/make_icon.py`: `python3 android/tools/make_icons.py`
 (needs Pillow).

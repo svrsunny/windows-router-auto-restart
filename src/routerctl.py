@@ -9,6 +9,9 @@ router-auto-restart command line. The PowerShell scripts in scripts\\ wrap these
   routerctl.py reboot --prompt        countdown window first (used by the scheduled task)
   routerctl.py watchdog [--demo]      background internet watchdog
   routerctl.py status                 one-screen summary
+  routerctl.py clients                Wi-Fi devices by SSID, and which ones are blocked
+  routerctl.py block MAC              cut a device's internet access (Parental Control rule)
+  routerctl.py unblock MAC            give it back
   routerctl.py models                 list supported router models
   routerctl.py check-config           validate config\\config.json
   routerctl.py set-password [--stdin] store the password in Windows Credential Manager
@@ -106,6 +109,43 @@ def cmd_status(cfg, _args) -> int:
     return 0
 
 
+def cmd_clients(cfg, _args) -> int:
+    events.setup_logging("clients", console=False)
+    rc, res = actions.list_clients(cfg)
+    if rc != actions.OK:
+        print(f"error: {res}", file=sys.stderr) if sys.stderr else None
+        return rc
+
+    def show(c):
+        flag = "  BLOCKED" if c.blocked else ""
+        print(f"    {c.mac}  {c.name or '(no name)':<24} {c.ip:<15} {c.rssi:>4}{flag}")
+
+    for s in res.ssids:
+        note = "" if s.can_block else "  (view only: this router can't block devices here)"
+        print(f"{s.name}  [{s.band}]  {max(s.reported, len(s.clients))} device(s){note}")
+        for c in s.clients:
+            show(c)
+        if s.reported > len(s.clients):
+            print(f"    + {s.reported - len(s.clients)} the router counts but doesn't list")
+    if res.unknown:
+        print("On Wi-Fi, SSID unknown (view only)")
+        for c in res.unknown:
+            show(c)
+    if res.blocked_offline:
+        print("Blocked, not connected now")
+        for c in res.blocked_offline:
+            show(c)
+    return 0
+
+
+def cmd_block(cfg, args) -> int:
+    events.setup_logging(args.cmd)
+    rc, _err = actions.set_blocked(cfg, args.mac, args.cmd == "block")   # failures are logged to the console
+    if rc == actions.OK:
+        print(f"{args.mac}: internet {'blocked' if args.cmd == 'block' else 'unblocked'}.")
+    return rc
+
+
 def cmd_models(_cfg, _args) -> int:
     from routerkit.routers import ADAPTERS
     for mid, cls in sorted(ADAPTERS.items()):
@@ -192,6 +232,10 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--demo", action="store_true", help="show the pop-ups once, without network checks")
     sub.add_parser("dashboard", help="open the dashboard")
     sub.add_parser("status", help="print a status summary")
+    sub.add_parser("clients", help="list Wi-Fi devices by SSID")
+    for name, text in (("block", "cut a device's internet access"), ("unblock", "give a device its internet back")):
+        b = sub.add_parser(name, help=text)
+        b.add_argument("mac", help="the device's MAC address, e.g. 00:00:5e:00:53:01")
     sub.add_parser("models", help="list supported router models")
     sub.add_parser("check-config", help="validate the configuration file")
     sp = sub.add_parser("set-password", help="store the router password in Credential Manager")
@@ -211,7 +255,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     handlers = {"reboot": cmd_reboot, "test": cmd_test, "watchdog": cmd_watchdog, "dashboard": cmd_dashboard,
-                None: cmd_dashboard, "status": cmd_status, "models": cmd_models, "check-config": cmd_check_config,
+                None: cmd_dashboard, "status": cmd_status, "clients": cmd_clients, "block": cmd_block,
+                "unblock": cmd_block, "models": cmd_models, "check-config": cmd_check_config,
                 "set-password": cmd_set_password, "clear-password": cmd_clear_password,
                 "install": cmd_install, "uninstall": cmd_uninstall}
     try:

@@ -49,6 +49,8 @@ public final class TestMain {
             tracker();
         } else if ("client".equals(mode)) {
             client(args[1], args[2], args[3], args[4]);
+        } else if ("group".equals(mode)) {
+            group(args[1]);
         } else if ("probe".equals(mode)) {
             System.out.println("PROBE " + Probe.tcpMs(new JvmNet(), args[1], Integer.parseInt(args[2]), 1500));
         }
@@ -161,6 +163,10 @@ public final class TestMain {
             rc.login(3, 200);
             if ("reboot".equals(action)) {
                 rc.reboot();
+            } else if ("list".equals(action)) {
+                System.out.print(dump(rc.listClients()));
+            } else if (action.startsWith("block:") || action.startsWith("unblock:")) {
+                rc.setBlocked(action.substring(action.indexOf(':') + 1), action.startsWith("block:"));
             }
             System.out.println("RESULT ok");
         } catch (RouterClient.BusyException e) {
@@ -172,5 +178,51 @@ public final class TestMain {
         } finally {
             rc.close();
         }
+    }
+
+    /** Same canonical text run_tests.py makes from the PC adapter's ClientList. */
+    static String dump(Clients cl) {
+        StringBuilder b = new StringBuilder();
+        for (Clients.Ssid s : cl.ssids) {
+            b.append("SSID|").append(s.name).append('|').append(s.band).append('|').append(s.canBlock ? 1 : 0)
+                    .append('|').append(s.reported).append('\n');
+            dumpClients(b, s.clients);
+        }
+        b.append("UNKNOWN\n");
+        dumpClients(b, cl.unknown);
+        b.append("OFFLINE\n");
+        dumpClients(b, cl.blockedOffline);
+        return b.toString();
+    }
+
+    private static void dumpClients(StringBuilder b, java.util.List<Clients.Client> list) {
+        for (Clients.Client c : list) {
+            b.append("C|").append(c.mac).append('|').append(c.name).append('|').append(c.ip).append('|')
+                    .append(c.rssi).append('|').append(c.blocked ? 1 : 0).append('\n');
+        }
+    }
+
+    private static String read(String path) throws IOException {
+        return new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)), StandardCharsets.UTF_8);
+    }
+
+    /** Parse saved pages (radio0 tbl0 radio1 tbl1 dhcp parental) like listClients() does, print dump(). */
+    static void group(String dir) throws Exception {
+        java.util.List<Clients.Radio> radios = new java.util.ArrayList<>();
+        java.util.List<java.util.List<String>> stations = new java.util.ArrayList<>();
+        for (int i = 0; i <= 1; i++) {
+            radios.add(Clients.parseRadio(read(dir + "/radio" + i + ".html")));
+            stations.add(Clients.parseStations(read(dir + "/tbl" + i + ".html")));
+        }
+        String pc = read(dir + "/parental.html");
+        java.util.Set<String> blocked = new java.util.HashSet<>();
+        if (Clients.parentalOn(pc)) {
+            for (Clients.Rule r : Clients.parseRules(pc)) {
+                if (!r.mac.isEmpty() && r.name.startsWith(Clients.RULE_PREFIX)) {
+                    blocked.add(r.mac);
+                }
+            }
+        }
+        System.out.print(dump(Clients.build(radios, stations, Clients.parseDhcp(read(dir + "/dhcp.html")), blocked)));
     }
 }

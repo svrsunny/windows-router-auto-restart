@@ -16,6 +16,7 @@ from .. import actions, credentials, events, net, scheduler, state, watchdog
 from ..config import CLI, ICON, LOGS, ROOT, Config, ensure_dirs
 from ..routers import ADAPTERS
 from ..util import ago, clock, dur, fmt, fmt_short, human
+from .clients import ClientsWindow
 from .theme import resolve_theme, set_icon, set_titlebar
 from .widgets import (UI, Button, Card, Chip, Dot, Ring, Sparkline, UptimeBar, ask_password, ask_schedule,
                       caption, confirm, label, round_rect)
@@ -49,6 +50,7 @@ class App:
         self.i_samples: deque = deque(maxlen=SAMPLES)
         self._status_job = None
         self._log_shown = None
+        self.clients_win = None
 
         root.title("Router Control")
         set_icon(root, ICON)
@@ -175,7 +177,8 @@ class App:
         self.b_test = Button(bar, ui, "Test login", self.test_login)
         self.b_skip = Button(bar, ui, "Skip next run", self.toggle_skip)
         self.b_pause = Button(bar, ui, "Pause schedule", self.toggle_pause)
-        for b in (self.b_reboot, self.b_test, self.b_skip, self.b_pause):
+        self.b_clients = Button(bar, ui, "Wi-Fi clients", self.open_clients)
+        for b in (self.b_reboot, self.b_test, self.b_skip, self.b_pause, self.b_clients):
             b.pack(side="left", padx=(0, px(10)))
         self.b_refresh = Button(bar, ui, "Refresh", self.refresh, "ghost")
         self.b_refresh.pack(side="right")
@@ -659,6 +662,14 @@ class App:
         except OSError as e:
             self.set_status(f"Could not start the watchdog: {e}", "bad")
         self.root.after(1500, self.fast_wake.set)
+
+    def open_clients(self):
+        if self.clients_win is not None and self.clients_win.winfo_exists():
+            self.clients_win.lift()
+            self.clients_win.focus_force()
+            return
+        self.clients_win = ClientsWindow(self.root, self.ui, self.cfg,
+                                         on_close=lambda: setattr(self, "clients_win", None))
 
     def copy_ip(self):
         ip = self.m.get("ip")

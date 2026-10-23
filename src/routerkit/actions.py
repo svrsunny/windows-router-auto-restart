@@ -10,7 +10,7 @@ from typing import Callable
 from . import credentials, events, net
 from .config import DATA, Config, ensure_dirs
 from .routers import RouterError, SessionBusyError, get_adapter
-from .routers.base import AuthError
+from .routers.base import AuthError, norm_mac
 from .util import dur
 
 log = logging.getLogger(__name__)
@@ -186,6 +186,53 @@ def wait_for_return(cfg: Config, sent: float, progress: Progress = _noop, sleep=
                   router_s=round(router_back - sent, 1),
                   internet_s=round(internet_back - sent, 1) if internet_back else None)
     return status
+
+
+# ---------- connected clients and internet blocking ----------
+
+def _on_router(cfg: Config, fn, session=None) -> tuple[int, object]:
+    """Log in, run fn(adapter), log out. Returns (OK, fn's result) or (error code, message)."""
+    password, _source = credentials.get_password()
+    if not password:
+        return NO_PASSWORD, "The router password isn't set yet."
+    events.protect(password)
+    try:
+        with get_adapter(cfg, password, session=session) as rc:
+            rc.login()
+            return OK, fn(rc)
+    except SessionBusyError:
+        return FAILED, "The router already has an admin session open (a browser tab?). Log out there and try again."
+    except AuthError:
+        return FAILED, "The router rejected the login. Check the username and password."
+    except RouterError as e:
+        return FAILED, str(e)
+    except Exception as e:  # noqa: BLE001
+        log.exception("unexpected error")
+        return FAILED, type(e).__name__
+
+
+def list_clients(cfg: Config, session=None) -> tuple[int, object]:
+    """(OK, ClientList) or (error code, message). Read-only."""
+    rc, res = _on_router(cfg, lambda a: a.list_clients(), session)
+    if rc != OK:
+        log.error("could not list clients: %s", res)
+    return rc, res
+
+
+def set_blocked(cfg: Config, mac: str, blocked: bool, session=None) -> tuple[int, str]:
+    """Block or unblock a device's internet access. (OK, "") or (error code, message)."""
+    kind = "block" if blocked else "unblock"
+    try:
+        mac = norm_mac(mac)
+    except ValueError as e:
+        return FAILED, str(e)
+    rc, res = _on_router(cfg, lambda a: a.set_blocked(mac, blocked), session)
+    events.record(kind, ok=rc == OK, mac=mac, **({} if rc == OK else {"detail": str(res)[:200]}))
+    if rc == OK:
+        log.info("%s %s: done", kind, mac)
+        return OK, ""
+    log.error("%s %s failed: %s", kind, mac, res)
+    return rc, str(res)
 
 
 # ---------- diagnostics (never restarts anything) ----------
