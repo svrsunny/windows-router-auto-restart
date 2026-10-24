@@ -26,6 +26,8 @@ public final class Tracker {
     public long lastRouterDown;
     public long lastReboot;
     public long noWifiSince;
+    /** The app already restarted the router by itself during this outage (at most once per outage). */
+    public boolean autoRebooted;
 
     /** Outage start / end for the last RECOVERED event. */
     public long eventStart;
@@ -64,6 +66,7 @@ public final class Tracker {
             outageStart = 0;
             alerted = false;
             awaitingRecovery = false;
+            autoRebooted = false;
             return ev;
         }
         if (outageStart == 0) {
@@ -75,6 +78,14 @@ public final class Tracker {
             return ALERT;
         }
         return NONE;
+    }
+
+    /**
+     * After an ALERT: should the app restart the router by itself? Only once per outage and outside the
+     * reboot cooldown; if that restart didn't help, the next ALERT is left to the user.
+     */
+    public boolean autoRebootAllowed(int event, long now) {
+        return event == ALERT && !autoRebooted && cooldownLeft(now) == 0;
     }
 
     /** Milliseconds until another reboot is allowed, 0 if it is allowed now. */
@@ -95,6 +106,7 @@ public final class Tracker {
         awaitingRecovery = false;
         outageStart = 0;
         noWifiSince = 0;
+        autoRebooted = false;
     }
 
     /** "less than a minute", "12 min", "1h 05m". */

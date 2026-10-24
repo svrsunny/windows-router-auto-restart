@@ -21,6 +21,7 @@ or both.
 - [Install](#install)
 - [Set up](#set-up)
 - [Test the alert](#test-the-alert)
+- [Fix it automatically (new in 3.1.0)](#fix-it-automatically-new-in-310)
 - [Wi-Fi clients (new in 3.0.0)](#wi-fi-clients-new-in-300)
 - [How it works](#how-it-works)
 - [Permissions](#permissions)
@@ -74,7 +75,10 @@ Open **Router Auto Restart** on the phone and:
 3. Turn on **Alert me when the router is up but the internet is down**. A silent notification
    appears in the shade and shows the latest check. It has to stay there: it's what lets Android
    keep the checks running.
-4. Tap **Allow unrestricted battery use** and accept. Some phone makers stop background apps even then:
+4. Optional, new in 3.1.0: turn on **Fix it automatically** so the app restarts the router by
+   itself when it finds the router up but the internet down. See
+   [Fix it automatically](#fix-it-automatically-new-in-310).
+5. Tap **Allow unrestricted battery use** and accept. Some phone makers stop background apps even then:
    - Samsung: *Settings > Battery > Background usage limits > Never sleeping apps*, add Router Auto Restart.
    - Xiaomi, Redmi, POCO: *App info > Autostart* on, and *Battery saver > No restrictions*.
    - Others: search the phone's settings for "battery optimization" or see [dontkillmyapp.com](https://dontkillmyapp.com).
@@ -88,6 +92,34 @@ Turn on **Simulate an outage** at the bottom of the app. Within about 15 seconds
 *No internet at home (test)* alert. Turn the switch off and you get *Internet is back*.
 
 > The **Reboot router** button on the test alert is real: it restarts the router.
+
+A test outage never triggers **Fix it automatically**. With that switch on, the app only says that a
+real outage would restart the router now.
+
+## Fix it automatically (new in 3.1.0)
+
+<img src="images/android-autofix-light.png" alt="Main screen with the Alert me switch and the new Fix it automatically switch turned on" width="300">
+
+Some routers lose their internet connection overnight, while nothing is using it, and don't
+reconnect until they're restarted. You then wake up to no internet. With **Fix it automatically**
+on, the app restarts the router itself when it finds that state, instead of only alerting you:
+
+- **Phone Wi-Fi on overnight:** the outage is found by the next check (about every 10 minutes while
+  the phone is idle) and fixed before you wake up.
+- **Phone Wi-Fi off overnight:** the app checks a few seconds after the phone joins Wi-Fi, instead of
+  waiting for the next check. The internet is back about 1½ to 2 minutes after you turn Wi-Fi on.
+
+Safety limits:
+
+- It acts only on a confirmed outage: the router answers, none of the internet targets do, and two
+  re-checks 5 seconds apart agree. The usual quiet periods after a restart still apply.
+- **Once per outage.** If the internet still isn't back after the automatic restart, you get the
+  normal alert with its **Reboot router** button. The app doesn't restart again by itself.
+- Never twice within 10 minutes, the same cooldown as a manual restart.
+- If the restart can't be sent, for example because the router's web page is open in a browser and
+  holds its one admin session, you get the normal alert instead. The reason is shown in the app.
+
+You get a *Router restarted automatically* notification, then *Internet is back* once it is.
 
 ## Wi-Fi clients (new in 3.0.0)
 
@@ -136,7 +168,11 @@ is typically reported within 10 to 15 minutes.
 
 **Restart from the alert.** *Reboot router* logs in and sends the restart request. The alert
 changes to *Router is rebooting*. Then either *Internet is back* arrives, or a new alert if the restart
-didn't help.
+didn't help. With **Fix it automatically** on, the app does this itself the first time, see
+[Fix it automatically](#fix-it-automatically-new-in-310).
+
+**When Wi-Fi connects** the app checks within about 10 seconds, instead of waiting for the next
+regular check.
 
 **Restart safety**, matching the Windows app:
 

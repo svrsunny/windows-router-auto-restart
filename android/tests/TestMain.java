@@ -152,6 +152,30 @@ public final class TestMain {
         check(t.cooldownLeft(T0 + 3 * M) == 7 * M, "3 min after a reboot: 7 min left");
         check(t.cooldownLeft(T0 + 10 * M) == 0, "10 min after a reboot: allowed again");
 
+        // 10. "Fix automatically": one automatic restart per outage, never inside the cooldown
+        t = new Tracker();
+        int ev = t.step(T0, true, true, false);
+        check(ev == Tracker.ALERT && t.autoRebootAllowed(ev, T0), "first alert of an outage: auto restart allowed");
+        check(!t.autoRebootAllowed(Tracker.NONE, T0), "no alert: no auto restart");
+        t.autoRebooted = true;
+        t.onRebootSent(T0);
+        check(t.awaitingRecovery, "auto restart counts as a reboot during the outage");
+        check(t.step(T0 + 3 * M, true, false, false) == Tracker.NONE, "router booting after the auto restart");
+        ev = t.step(T0 + 9 * M, true, true, false);
+        check(ev == Tracker.ALERT, "auto restart didn't help: alert again after the graces");
+        check(!t.autoRebootAllowed(ev, T0 + 9 * M), "...but no second auto restart in the same outage");
+        check(t.step(T0 + 20 * M, true, true, true) == Tracker.RECOVERED && !t.autoRebooted,
+                "internet back: recovered, and the next outage may auto restart again");
+        ev = t.step(T0 + 120 * M, true, true, false);
+        check(ev == Tracker.ALERT && t.autoRebootAllowed(ev, T0 + 120 * M), "next outage: auto restart allowed again");
+        t = new Tracker();
+        t.lastReboot = T0 - 6 * M;                 // a manual restart 6 min ago, grace over, cooldown not
+        ev = t.step(T0, true, true, false);
+        check(ev == Tracker.ALERT && !t.autoRebootAllowed(ev, T0), "inside the 10-min cooldown: no auto restart");
+        t.autoRebooted = true;
+        t.reset();
+        check(!t.autoRebooted, "reset clears the auto-restart flag");
+
         check("less than a minute".equals(Tracker.duration(30_000)), "duration <1 min");
         check("12 min".equals(Tracker.duration(12 * M + 5000)), "duration 12 min");
         check("1h 05m".equals(Tracker.duration(65 * M)), "duration 1h 05m");

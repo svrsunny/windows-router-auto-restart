@@ -7,7 +7,10 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.net.ConnectivityManager;
 import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -40,10 +43,53 @@ public final class WatchService extends Service {
     private static final int ROUTER_TIMEOUT_MS = 2000;
     private static final int INTERNET_TIMEOUT_MS = 2500;
     private static final long RECHECK_DELAY_MS = 5000;
+    /** After the phone joins Wi-Fi, wait this long (address, DNS) before checking. */
+    private static final long WIFI_SETTLE_MS = 8000;
+    /** A Wi-Fi-triggered check is skipped if a check ran this recently. */
+    private static final long WIFI_MIN_GAP_MS = 20000;
 
     private ExecutorService exec;
     private Handler main;
     private final AtomicInteger pending = new AtomicInteger();
+    private ConnectivityManager.NetworkCallback wifiCallback;
+    private volatile long lastCheckAt;      // elapsedRealtime of the last check
+
+    /**
+     * Check soon after the phone joins Wi-Fi instead of waiting for the next alarm, so an outage
+     * found when you turn Wi-Fi on in the morning is handled within seconds.
+     */
+    private void watchWifi() {
+        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+        if (cm == null) {
+            return;
+        }
+        wifiCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                main.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (Prefs.enabled(WatchService.this)
+                                && SystemClock.elapsedRealtime() - lastCheckAt >= WIFI_MIN_GAP_MS) {
+                            submit(new Runnable() {
+                                @Override
+                                public void run() {
+                                    check();
+                                }
+                            });
+                        }
+                    }
+                }, WIFI_SETTLE_MS);
+            }
+        };
+        try {
+            cm.registerNetworkCallback(new NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(), wifiCallback);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "can't watch Wi-Fi: " + e);
+            wifiCallback = null;
+        }
+    }
 
     /** Used by the app screen (which is in the foreground, so starting a foreground service is allowed). */
     static void send(Context c, String action) {
@@ -56,6 +102,7 @@ public final class WatchService extends Service {
         exec = Executors.newSingleThreadExecutor();
         main = new Handler(Looper.getMainLooper());
         Notifs.createChannels(this);
+        watchWifi();
     }
 
     @Override
@@ -65,6 +112,14 @@ public final class WatchService extends Service {
 
     @Override
     public void onDestroy() {
+        if (wifiCallback != null) {
+            try {
+                getSystemService(ConnectivityManager.class).unregisterNetworkCallback(wifiCallback);
+            } catch (RuntimeException e) {
+                // already gone
+            }
+        }
+        main.removeCallbacksAndMessages(null);
         exec.shutdown();
         super.onDestroy();
     }
@@ -89,14 +144,14 @@ public final class WatchService extends Service {
             submit(new Runnable() {
                 @Override
                 public void run() {
-                    routerAction(false, fromNotification);
+                    routerAction(false, fromNotification, false);
                 }
             });
         } else if (ACTION_TEST_LOGIN.equals(action)) {
             submit(new Runnable() {
                 @Override
                 public void run() {
-                    routerAction(true, false);
+                    routerAction(true, false, false);
                 }
             });
         } else if (Prefs.enabled(this)) {          // START or CHECK
@@ -219,6 +274,7 @@ public final class WatchService extends Service {
         if (!Prefs.enabled(this)) {
             return;
         }
+        lastCheckAt = SystemClock.elapsedRealtime();
         try {
             doCheck();
         } finally {
@@ -295,10 +351,26 @@ public final class WatchService extends Service {
                 line = line + " (simulated)";
             }
         }
+        // "Fix automatically": restart the router once for this outage instead of only alerting.
+        // Never during "Simulate an outage": that switch must stay safe to play with.
+        boolean autoReboot = Prefs.autoFix(this) && !sim && t.autoRebootAllowed(ev, now);
+        if (autoReboot) {
+            t.autoRebooted = true;
+        }
         Prefs.saveTracker(this, t);
         Prefs.setStatus(this, kind, line, detail);
-        if (ev == Tracker.ALERT) {
+        if (autoReboot) {
+            if (!routerAction(false, false, true)) {
+                // couldn't restart it (e.g. a browser holds the router's one admin session): alert instead;
+                // the reason is shown in the app
+                Notifs.alert(this, time(t.outageStart), false);
+            }
+        } else if (ev == Tracker.ALERT) {
             Notifs.alert(this, time(t.outageStart), sim);
+            if (sim && Prefs.autoFix(this)) {
+                Prefs.setAction(this, "Test outage: with Fix automatically on, a real outage would restart the "
+                        + "router now. Nothing was restarted.");
+            }
         } else if (ev == Tracker.RECOVERED) {
             Notifs.recovered(this, Tracker.duration(t.eventEnd - t.eventStart), time(t.eventStart), time(t.eventEnd));
         } else if (ev == Tracker.CLEARED) {
@@ -311,12 +383,17 @@ public final class WatchService extends Service {
 
     // ---------- reboot / login test ----------
 
-    private void routerAction(boolean dryRun, boolean fromNotification) {
-        String what = dryRun ? "Login test" : "Reboot";
+    /**
+     * automatic: the app restarts the router by itself after a confirmed outage ("Fix automatically").
+     * It reports like a restart from the notification, so a failure shows up there too.
+     */
+    private boolean routerAction(boolean dryRun, boolean fromNotification, boolean automatic) {
+        fromNotification = fromNotification || automatic;
+        String what = dryRun ? "Login test" : automatic ? "Automatic reboot" : "Reboot";
         String url = Prefs.routerUrl(this);
         if (url.isEmpty()) {
             fail(what, "No router address saved. Open Router Auto Restart and save it first.", fromNotification);
-            return;
+            return false;
         }
         if (!dryRun) {
             Tracker t = Prefs.loadTracker(this);
@@ -325,18 +402,18 @@ public final class WatchService extends Service {
                 // the reboot request is never repeated within the cooldown (same rule as the PC app)
                 fail(what, "A reboot was already sent at " + time(t.lastReboot) + ". Try again after "
                         + time(t.lastReboot + Tracker.REBOOT_COOLDOWN_MS) + ".", fromNotification);
-                return;
+                return false;
             }
         }
         String password = Prefs.password(this);
         if (password == null) {
             fail(what, "No router password saved. Open Router Auto Restart and save it first.", fromNotification);
-            return;
+            return false;
         }
         Network wifi = AndroidNet.findWifi(this);
         if (wifi == null) {
             fail(what, "The phone isn't on Wi-Fi. Connect to your home Wi-Fi and try again.", fromNotification);
-            return;
+            return false;
         }
         Prefs.setAction(this, dryRun ? "Testing the login..." : "Rebooting the router...");
         if (fromNotification) {
@@ -349,7 +426,7 @@ public final class WatchService extends Service {
             if (dryRun) {
                 Prefs.setAction(this, "Login OK at " + time(System.currentTimeMillis())
                         + ". The saved password works.");
-                return;
+                return true;
             }
             rc.reboot();
             long now = System.currentTimeMillis();
@@ -357,12 +434,15 @@ public final class WatchService extends Service {
             t.onRebootSent(now);
             Prefs.saveTracker(this, t);
             boolean willNotify = Prefs.enabled(this) && t.awaitingRecovery;
-            String msg = "Reboot sent at " + time(now) + ". The internet should be back in 2-3 minutes"
+            String msg = (automatic ? "The internet was down since " + time(t.outageStart) + ", so the app restarted "
+                    + "the router at " + time(now) + "." : "Reboot sent at " + time(now) + ".")
+                    + " The internet should be back in 2-3 minutes"
                     + (willNotify ? "; you'll get a notification when it is." : ".");
             Prefs.setAction(this, msg);
             if (fromNotification || t.awaitingRecovery) {
-                Notifs.info(this, "Router is rebooting", msg);
+                Notifs.info(this, automatic ? "Router restarted automatically" : "Router is rebooting", msg);
             }
+            return true;
         } catch (RouterClient.RouterException e) {
             fail(what, e.getMessage(), fromNotification);
         } catch (InterruptedException e) {
@@ -371,6 +451,7 @@ public final class WatchService extends Service {
         } finally {
             rc.close();
         }
+        return false;
     }
 
     private void fail(String what, String msg, boolean fromNotification) {

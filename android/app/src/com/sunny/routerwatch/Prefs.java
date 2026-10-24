@@ -160,6 +160,15 @@ final class Prefs {
         sp(c).edit().putBoolean("simulate", on).apply();
     }
 
+    /** Restart the router by itself when an outage is confirmed (off unless the user turns it on). */
+    static boolean autoFix(Context c) {
+        return sp(c).getBoolean("auto_fix", false);
+    }
+
+    static void setAutoFix(Context c, boolean on) {
+        sp(c).edit().putBoolean("auto_fix", on).apply();
+    }
+
     // ---------- tracker state (survives the app being killed) ----------
 
     static Tracker loadTracker(Context c) {
@@ -171,6 +180,7 @@ final class Prefs {
         t.lastRouterDown = p.getLong("t_router_down", 0);
         t.lastReboot = p.getLong("t_reboot", 0);
         t.noWifiSince = p.getLong("t_no_wifi", 0);
+        t.autoRebooted = p.getBoolean("t_auto_rebooted", false);
         return t;
     }
 
@@ -182,6 +192,7 @@ final class Prefs {
                 .putLong("t_router_down", t.lastRouterDown)
                 .putLong("t_reboot", t.lastReboot)
                 .putLong("t_no_wifi", t.noWifiSince)
+                .putBoolean("t_auto_rebooted", t.autoRebooted)
                 .apply();
     }
 

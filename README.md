@@ -34,6 +34,8 @@ interface, exactly as you would in a browser, and presses its restart button for
 - **Credentials** are stored in Windows Credential Manager. They never go in files, logs, task arguments or URLs.
 - **Android companion app (optional, new in 2.2.0):** alerts on your phone when the router is up but
   the internet is down, and restarts the router with one tap. See [Android companion app](#android-companion-app).
+- **Fix it automatically (new in 3.1.0):** the phone app can restart the router by itself when the
+  internet is down, for example after an overnight drop, so no PC has to stay on.
 - **Wi-Fi clients and internet blocking (new in 3.0.0):** lists the devices on each SSID and blocks or
   unblocks a device's internet access with one click, on the PC and on the phone. See
   [Wi-Fi clients and blocking](#wi-fi-clients-and-blocking-new-in-300).
@@ -106,6 +108,11 @@ the router answers but the internet doesn't. When that happens you get a notific
   retried, and refused for 10 minutes after one was sent.
 - **New in 3.0.0:** a **Wi-Fi clients** screen lists the devices on each SSID and blocks or unblocks
   their internet access, the same way as the Windows app (see [above](#wi-fi-clients-and-blocking-new-in-300)).
+- **New in 3.1.0: Fix it automatically.** If your router loses the internet overnight and doesn't
+  reconnect, the app restarts it for you, once per outage. It doesn't need the PC. With the phone's
+  Wi-Fi on overnight it's fixed before you wake up; otherwise seconds after you turn Wi-Fi on. The
+  app also checks as soon as the phone joins Wi-Fi. Details in
+  [docs/android.md](docs/android.md#fix-it-automatically-new-in-310).
 - The password is encrypted with a key in the Android Keystore. No telemetry, no third-party libraries.
 
 | Main screen | Wi-Fi clients (new in 3.0.0) | Outage alert | Internet back |

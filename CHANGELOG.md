@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.1.0
+
+- Android: new **Fix it automatically** switch, off by default. When the app finds the router up but
+  the internet down, it restarts the router itself instead of only alerting. This is for routers
+  that lose their connection overnight and don't reconnect. It acts on a confirmed outage only,
+  **once per outage**, and never within the 10-minute cooldown. If that doesn't help, or the restart
+  can't be sent, you get the normal alert. *Simulate an outage* never triggers it.
+- Android: the app checks within seconds of the phone joining Wi-Fi, instead of waiting for the next
+  regular check. An outage found in the morning is fixed about 1½–2 minutes after Wi-Fi is turned on.
+- Windows app unchanged.
+
 ## 3.0.0
 
 - New: **Wi-Fi clients**, in the Windows dashboard (*Wi-Fi clients* button, or `routerctl.py clients`)

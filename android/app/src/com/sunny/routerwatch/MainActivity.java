@@ -35,6 +35,7 @@ public final class MainActivity extends Activity {
     private TextView statusDetail;
     private TextView actionText;
     private Switch watchSwitch;
+    private Switch autoSwitch;
     private Switch simSwitch;
     private EditText urlEdit;
     private EditText userEdit;
@@ -62,6 +63,13 @@ public final class MainActivity extends Activity {
             } else {
                 WatchService.send(MainActivity.this, WatchService.ACTION_STOP);
             }
+        }
+    };
+
+    private final CompoundButton.OnCheckedChangeListener autoListener = new CompoundButton.OnCheckedChangeListener() {
+        @Override
+        public void onCheckedChanged(CompoundButton b, boolean on) {
+            Prefs.setAutoFix(MainActivity.this, on);
         }
     };
 
@@ -179,6 +187,16 @@ public final class MainActivity extends Activity {
         watchSwitch.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         add(root, watchSwitch, 24);
 
+        autoSwitch = new Switch(this);
+        autoSwitch.setText("Fix it automatically: restart the router when that happens");
+        autoSwitch.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        add(root, autoSwitch, 12);
+        TextView autoNote = text("Once per outage, and never twice within 10 minutes. Leave the phone's Wi-Fi on "
+                + "overnight and it's fixed before you wake up; otherwise it's fixed seconds after you turn Wi-Fi on.",
+                13, false);
+        autoNote.setAlpha(0.7f);
+        add(root, autoNote, 2);
+
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -282,6 +300,10 @@ public final class MainActivity extends Activity {
         watchSwitch.setOnCheckedChangeListener(null);
         watchSwitch.setChecked(enabled);
         watchSwitch.setOnCheckedChangeListener(watchListener);
+        autoSwitch.setOnCheckedChangeListener(null);
+        autoSwitch.setChecked(Prefs.autoFix(this));
+        autoSwitch.setEnabled(enabled);            // it acts on the checks, which run only while alerts are on
+        autoSwitch.setOnCheckedChangeListener(autoListener);
         simSwitch.setOnCheckedChangeListener(null);
         simSwitch.setChecked(Prefs.simulate(this));
         simSwitch.setOnCheckedChangeListener(simListener);
